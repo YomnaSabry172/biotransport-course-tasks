@@ -1,0 +1,628 @@
+classdef biotransport_full_app < matlab.apps.AppBase
+
+    % --- Properties: Component Declarations ---
+    properties (Access = public)
+        UIFigure                        matlab.ui.Figure
+        
+        % Tabs Container
+        UITabGroup                      matlab.ui.container.TabGroup
+        Tab_Calculator                  matlab.ui.container.Tab % 1. Part 4
+        Tab_PredefinedCases             matlab.ui.container.Tab % 2. Part 1
+        Tab_Profiles                    matlab.ui.container.Tab % 3. Part 2
+        Tab_Friction                    matlab.ui.container.Tab % 4. Part 3
+        Tab_Concepts                    matlab.ui.container.Tab % 5. Part 5
+        
+        % --- Components for Tab 1 (Calculator) ---
+        Densitykgm3EditFieldLabel       matlab.ui.control.Label
+        Densitykgm3EditField            matlab.ui.control.NumericEditField
+        VelocitymsEditFieldLabel        matlab.ui.control.Label
+        VelocitymsEditField             matlab.ui.control.NumericEditField
+        ViscosityPasEditFieldLabel      matlab.ui.control.Label
+        ViscosityPasEditField           matlab.ui.control.NumericEditField
+        
+        DiametermEditFieldLabel         matlab.ui.control.Label
+        DiametermEditField              matlab.ui.control.NumericEditField
+        WidthmEditFieldLabel            matlab.ui.control.Label
+        WidthmEditField                 matlab.ui.control.NumericEditField
+        HeightmEditFieldLabel           matlab.ui.control.Label
+        HeightmEditField                matlab.ui.control.NumericEditField
+        SidemEditFieldLabel             matlab.ui.control.Label
+        SidemEditField                  matlab.ui.control.NumericEditField
+        OuterDiametermEditFieldLabel    matlab.ui.control.Label
+        OuterDiametermEditField         matlab.ui.control.NumericEditField
+        InnerDiametermEditFieldLabel    matlab.ui.control.Label
+        InnerDiametermEditField         matlab.ui.control.NumericEditField
+        ShapeDropDownLabel              matlab.ui.control.Label
+        ShapeDropDown                   matlab.ui.control.DropDown
+        Image                           matlab.ui.control.Image
+        
+        ReynoldsNumberEditFieldLabel    matlab.ui.control.Label
+        ReynoldsNumberEditField         matlab.ui.control.EditField
+        FlowRegimeEditFieldLabel        matlab.ui.control.Label
+        FlowRegimeEditField             matlab.ui.control.EditField
+        DarcyFrictionFactorfEditFieldLabel matlab.ui.control.Label
+        DarcyFrictionFactorfEditField   matlab.ui.control.EditField
+        
+        CalculateButton                 matlab.ui.control.Button
+        ClearButton                     matlab.ui.control.Button
+        
+        % --- Components for Tab 2 ---
+        UITable_Results                 matlab.ui.control.Table 
+        RunAnalysisButton               matlab.ui.control.Button 
+        
+        % --- Components for Tab 3 ---
+        UIAxes_Profiles                 matlab.ui.control.UIAxes
+        
+        % --- Components for Tab 4 ---
+        UIAxes_Friction                 matlab.ui.control.UIAxes
+        
+        % --- Components for Tab 5 ---
+        UIAxes_Laminar                  matlab.ui.control.UIAxes
+        UIAxes_Transition               matlab.ui.control.UIAxes
+        UIAxes_Turbulent                matlab.ui.control.UIAxes
+        PlotConceptualFlowTitle         matlab.ui.control.Label
+        
+        FullResultsTable
+    end
+
+    properties (Access = private)
+        LastCaseData
+    end
+
+    % --- Startup ---
+    methods (Access = private)
+        function startupFcn(app)
+            try
+                [ResultsTable, LastCaseData] = biotransport_analysis_functions('RunCaseAnalysis');
+            catch ME
+                % If backend missing, provide defaults
+                ResultsTable = table();
+                LastCaseData = struct('D', 0.05, 'v_avg', 0.1, 'Re', 0, 'regime', 'Laminar', 'name', '');
+                warning('RunCaseAnalysis backend unavailable: %s', ME.message);
+            end
+
+            app.FullResultsTable = ResultsTable;
+            app.LastCaseData = LastCaseData;
+            
+            if ~isempty(ResultsTable)
+                app.UITable_Results.Data = ResultsTable;
+                app.UITable_Results.ColumnName = ResultsTable.Properties.VariableNames;
+            else
+                app.UITable_Results.Data = cell(0,1);
+            end
+
+            % Part 3 Friction plot (if backend exists)
+            try
+                biotransport_analysis_functions('PlotFrictionFactor', app.UIAxes_Friction);
+            catch
+            end
+            
+            % Part 2 initial profile plot
+            try
+                biotransport_analysis_functions('PlotFlowProfiles', app.UIAxes_Profiles, LastCaseData.D, LastCaseData.v_avg, LastCaseData.Re, LastCaseData.regime, LastCaseData.name);
+            catch
+            end
+            
+            % Part 5 conceptual plots
+            try
+                biotransport_analysis_functions('PlotConceptualFlow_Final', app.UIAxes_Laminar, app.UIAxes_Transition, app.UIAxes_Turbulent);
+            catch
+            end
+
+            app.Image.ImageSource = 'circular_pipe.png';
+            app.updateFieldVisibility();
+        end
+    end
+
+    % --- Callbacks ---
+    methods (Access = private)
+        function UITable_ResultsCellSelection(app, event)
+            indices = event.Indices;
+            if isempty(indices)
+                return;
+            end
+            row = indices(1, 1);
+            try
+                SelectedCase = app.FullResultsTable(row, :);
+            catch
+                return;
+            end
+            D = SelectedCase.HydraulicDiameter_m;
+            v_avg = SelectedCase.Velocity_ms;
+            Re = SelectedCase.ReynoldsNumber;
+            regime = SelectedCase.FlowRegime{1};
+            name = [SelectedCase.FluidName{1}, ' - ', SelectedCase.Configuration{1}];
+
+            try
+                biotransport_analysis_functions('PlotFlowProfiles', app.UIAxes_Profiles, D, v_avg, Re, regime, name);
+            catch ME
+                warning('PlotFlowProfiles failed: %s', ME.message);
+            end
+            app.UITabGroup.SelectedTab = app.Tab_Profiles;
+        end
+
+        function ShapeDropDownValueChanged(app, ~)
+            app.updateFieldVisibility(); 
+        end
+
+        function ClearButtonPushed(app, ~)
+            app.Densitykgm3EditField.Value = 0;
+            app.VelocitymsEditField.Value = 0;
+            app.ViscosityPasEditField.Value = 0;
+            app.DiametermEditField.Value = 0;
+            app.WidthmEditField.Value = 0;
+            app.HeightmEditField.Value = 0;
+            app.SidemEditField.Value = 0;
+            app.OuterDiametermEditField.Value = 0;
+            app.InnerDiametermEditField.Value = 0;
+            app.ReynoldsNumberEditField.Value = '';
+            app.FlowRegimeEditField.Value = '';
+            app.DarcyFrictionFactorfEditField.Value = '';
+            app.FlowRegimeEditField.BackgroundColor = [0.2 0.2 0.2];
+        end
+
+        function CalculateButtonPushed(app, ~)
+            rho = app.Densitykgm3EditField.Value;
+            v   = app.VelocitymsEditField.Value;
+            mu  = app.ViscosityPasEditField.Value;
+            shape = app.ShapeDropDown.Value; 
+
+            if rho <= 0 || v <= 0 || mu <= 0
+                app.FlowRegimeEditField.Value = 'ERROR';
+                app.FlowRegimeEditField.BackgroundColor = [0.4 0 0];
+                return;
+            end
+            
+            Dh = 0; 
+            switch shape
+                case "Circular Pipe"
+                    D = app.DiametermEditField.Value;
+                    if D > 0, Dh = D; end
+                case "Rectangular Duct"
+                    w = app.WidthmEditField.Value;
+                    h = app.HeightmEditField.Value;
+                    if w > 0 && h > 0, Dh = (2 * w * h) / (w + h); end
+                case "Square Duct"
+                    s = app.SidemEditField.Value; 
+                    if s > 0, Dh = s; end
+                case "Concentric Annulus"
+                    Do = app.OuterDiametermEditField.Value; 
+                    Di = app.InnerDiametermEditField.Value; 
+                    if Do > 0 && Di > 0 && Di < Do, Dh = Do - Di; end
+            end
+
+            if Dh <= 0
+                app.FlowRegimeEditField.Value = 'ERROR';
+                app.FlowRegimeEditField.BackgroundColor = [0.4 0 0];
+                return;
+            end
+
+            Re = (rho * v * Dh) / mu;
+            
+            if Re < 2000
+                regime = 'LAMINAR'; color = [0.3 0.6 0.3];
+            elseif Re < 4000
+                regime = 'TRANSITIONAL'; color = [0.7 0.5 0.2];
+            else
+                regime = 'TURBULENT'; color = [0.7 0.2 0.2];
+            end
+
+            f = NaN;
+            if strcmp(regime, 'LAMINAR')
+                if strcmp(shape, "Square Duct"), f = 56.92 / Re;
+                else, f = 64 / Re;
+                end
+            elseif strcmp(regime, 'TURBULENT')
+                f = 0.3164 / (Re^0.25);
+            end
+
+            app.ReynoldsNumberEditField.Value = sprintf('%.2f', Re);
+            app.FlowRegimeEditField.Value = regime;
+            app.FlowRegimeEditField.BackgroundColor = color;
+
+            if isnan(f)
+                app.DarcyFrictionFactorfEditField.Value = 'N/A';
+            else
+                app.DarcyFrictionFactorfEditField.Value = sprintf('%.4f', f);
+            end
+
+            dynamic_data = struct('D', Dh, 'v_avg', v, 'Re', Re, 'regime', regime, 'name', 'Interactive Case');
+            try
+                app.UITabGroup.SelectedTab = app.Tab_Profiles;
+                biotransport_analysis_functions('PlotFlowProfiles', app.UIAxes_Profiles, dynamic_data.D, dynamic_data.v_avg, dynamic_data.Re, dynamic_data.regime, dynamic_data.name);
+            catch
+            end
+        end
+
+        % --- UPDATED ---
+        function RunAnalysisButtonPushed(app, ~)
+            try
+                [ResultsTable, LastCaseData] = biotransport_analysis_functions('RunCaseAnalysis');
+            catch ME
+                errordlg(['Failed to run RunCaseAnalysis: ' ME.message], 'Backend Error');
+                return;
+            end
+
+            app.FullResultsTable = ResultsTable; 
+            app.LastCaseData = LastCaseData;
+            app.UITable_Results.Data = ResultsTable;
+
+            % Update Part 2 plot
+            try
+                biotransport_analysis_functions('PlotFlowProfiles', app.UIAxes_Profiles, LastCaseData.D, LastCaseData.v_avg, LastCaseData.Re, LastCaseData.regime, LastCaseData.name);
+            catch
+            end
+
+            % ✅ NEW: Update Part 3 Friction plot
+            try
+                biotransport_analysis_functions('PlotFrictionFactor', app.UIAxes_Friction);
+            catch ME
+                warning('PlotFrictionFactor failed: %s', ME.message);
+            end
+
+            app.UITabGroup.SelectedTab = app.Tab_PredefinedCases;
+        end
+
+        function PlotConceptualFlowButtonPushed(app, ~)
+            try
+                biotransport_analysis_functions('PlotConceptualFlow_Final', app.UIAxes_Laminar, app.UIAxes_Transition, app.UIAxes_Turbulent);
+            catch
+            end
+        end
+
+        function updateFieldVisibility(app)
+            all_shape_components = {
+                app.DiametermEditFieldLabel, app.DiametermEditField;
+                app.WidthmEditFieldLabel, app.WidthmEditField;
+                app.HeightmEditFieldLabel, app.HeightmEditField;
+                app.SidemEditFieldLabel, app.SidemEditField;
+                app.OuterDiametermEditFieldLabel, app.OuterDiametermEditField;
+                app.InnerDiametermEditFieldLabel, app.InnerDiametermEditField
+            };
+            for i = 1:size(all_shape_components, 1)
+                all_shape_components{i, 1}.Visible = 'off';
+                all_shape_components{i, 2}.Visible = 'off';
+            end
+            
+            shape = app.ShapeDropDown.Value;
+            image_map = struct(...
+                'CircularPipe', 'circular_pipe.png', ...
+                'RectangularDuct', 'rectangular_duct.png', ...
+                'SquareDuct', 'square_duct.png', ...
+                'ConcentricAnnulus', 'concentric_annulus.png' ...
+            );
+            image_key = strrep(shape, ' ', '');
+            if isfield(image_map, image_key)
+                app.Image.ImageSource = image_map.(image_key);
+            else
+                app.Image.ImageSource = 'https://placehold.co/150x150/333333/FFFFFF?text=NO+IMAGE';
+            end
+
+            switch shape
+                case "Circular Pipe"
+                    app.DiametermEditFieldLabel.Visible = 'on';
+                    app.DiametermEditField.Visible = 'on';
+                case "Rectangular Duct"
+                    app.WidthmEditFieldLabel.Visible = 'on';
+                    app.WidthmEditField.Visible = 'on';
+                    app.HeightmEditFieldLabel.Visible = 'on';
+                    app.HeightmEditField.Visible = 'on';
+                case "Square Duct"
+                    app.SidemEditFieldLabel.Visible = 'on';
+                    app.SidemEditField.Visible = 'on';
+                case "Concentric Annulus"
+                    app.OuterDiametermEditFieldLabel.Visible = 'on';
+                    app.OuterDiametermEditField.Visible = 'on';
+                    app.InnerDiametermEditFieldLabel.Visible = 'on';
+                    app.InnerDiametermEditField.Visible = 'on';
+            end
+        end
+    end
+
+    % --- UI Initialization ---
+    methods (Access = private)
+        function createComponents(app)
+            % === Dark Mode Colors ===
+            bg = [30 30 46]/255;
+            tabbg = [43 43 60]/255;
+            accent = [78 159 255]/255;   % main accent blue
+            violet = [122 97 255]/255;   % secondary accent
+            danger = [255 107 107]/255;  % clear button
+            inputBg = [47 47 64]/255;
+            textColor = [224 224 224]/255;
+
+            % Main figure
+            app.UIFigure = uifigure('Visible', 'off');
+            app.UIFigure.Color = bg;
+            app.UIFigure.Position = [100 100 1000 650];
+            app.UIFigure.Name = 'SBEG201 Biotransport (Dark Mode)';
+
+            % Tab group
+            app.UITabGroup = uitabgroup(app.UIFigure);
+            app.UITabGroup.Position = [10 10 980 630];
+            app.UITabGroup.BackgroundColor = tabbg;
+
+            % Tabs
+            app.Tab_Calculator = uitab(app.UITabGroup, 'Title', '1. Calculator (Part 4)');
+            app.Tab_PredefinedCases = uitab(app.UITabGroup, 'Title', '2. Predefined Cases (Part 1)');
+            app.Tab_Profiles = uitab(app.UITabGroup, 'Title', '3. Velocity Profiles (Part 2)');
+            app.Tab_Friction = uitab(app.UITabGroup, 'Title', '4. Friction Factor (Part 3)');
+            app.Tab_Concepts = uitab(app.UITabGroup, 'Title', '5. Conceptual Flow (Part 5)');
+
+            % Calculator inputs
+            app.Densitykgm3EditFieldLabel = uilabel(app.Tab_Calculator);
+            app.Densitykgm3EditFieldLabel.Position = [30 520 140 22];
+            app.Densitykgm3EditFieldLabel.Text = 'Density {kg/m^3}';
+            app.Densitykgm3EditFieldLabel.FontColor = textColor;
+            app.Densitykgm3EditField = uieditfield(app.Tab_Calculator, 'numeric');
+            app.Densitykgm3EditField.Position = [180 520 120 22];
+            app.Densitykgm3EditField.BackgroundColor = inputBg;
+            app.Densitykgm3EditField.FontColor = [1 1 1];
+            app.Densitykgm3EditField.Value = 998.2;
+
+            app.VelocitymsEditFieldLabel = uilabel(app.Tab_Calculator);
+            app.VelocitymsEditFieldLabel.Position = [30 480 140 22];
+            app.VelocitymsEditFieldLabel.Text = 'Velocity {m/s}';
+            app.VelocitymsEditFieldLabel.FontColor = textColor;
+            app.VelocitymsEditField = uieditfield(app.Tab_Calculator, 'numeric');
+            app.VelocitymsEditField.Position = [180 480 120 22];
+            app.VelocitymsEditField.BackgroundColor = inputBg;
+            app.VelocitymsEditField.FontColor = [1 1 1];
+            app.VelocitymsEditField.Value = 0.1;
+
+            app.ViscosityPasEditFieldLabel = uilabel(app.Tab_Calculator);
+            app.ViscosityPasEditFieldLabel.Position = [30 440 140 22];
+            app.ViscosityPasEditFieldLabel.Text = 'Viscosity {Pa-s}';
+            app.ViscosityPasEditFieldLabel.FontColor = textColor;
+            app.ViscosityPasEditField = uieditfield(app.Tab_Calculator, 'numeric');
+            app.ViscosityPasEditField.Position = [180 440 120 22];
+            app.ViscosityPasEditField.BackgroundColor = inputBg;
+            app.ViscosityPasEditField.FontColor = [1 1 1];
+            app.ViscosityPasEditField.Value = 1.002e-3;
+
+            app.ShapeDropDownLabel = uilabel(app.Tab_Calculator);
+            app.ShapeDropDownLabel.Position = [340 520 50 22];
+            app.ShapeDropDownLabel.Text = 'Shape';
+            app.ShapeDropDownLabel.FontColor = textColor;
+            app.ShapeDropDown = uidropdown(app.Tab_Calculator);
+            app.ShapeDropDown.Items = {'Circular Pipe', 'Rectangular Duct', 'Square Duct', 'Concentric Annulus'};
+            app.ShapeDropDown.Position = [410 520 170 22];
+            app.ShapeDropDown.BackgroundColor = inputBg;
+            app.ShapeDropDown.FontColor = [1 1 1];
+            app.ShapeDropDown.ValueChangedFcn = createCallbackFcn(app, @ShapeDropDownValueChanged, true);
+            app.ShapeDropDown.Value = 'Circular Pipe';
+
+            app.DiametermEditFieldLabel = uilabel(app.Tab_Calculator);
+            app.DiametermEditFieldLabel.Position = [30 380 100 22];
+            app.DiametermEditFieldLabel.Text = 'Diameter {m}';
+            app.DiametermEditFieldLabel.FontColor = textColor;
+            app.DiametermEditField = uieditfield(app.Tab_Calculator, 'numeric');
+            app.DiametermEditField.Position = [140 380 160 22];
+            app.DiametermEditField.BackgroundColor = inputBg;
+            app.DiametermEditField.FontColor = [1 1 1];
+            app.DiametermEditField.Value = 0.05;
+
+            app.WidthmEditFieldLabel = uilabel(app.Tab_Calculator);
+            app.WidthmEditFieldLabel.Position = [30 380 80 22];
+            app.WidthmEditFieldLabel.Text = 'Width {m}';
+            app.WidthmEditFieldLabel.FontColor = textColor;
+            app.WidthmEditField = uieditfield(app.Tab_Calculator, 'numeric');
+            app.WidthmEditField.Position = [120 380 160 22];
+            app.WidthmEditField.BackgroundColor = inputBg;
+            app.WidthmEditField.FontColor = [1 1 1];
+            app.WidthmEditField.Value = 0.08;
+
+            app.HeightmEditFieldLabel = uilabel(app.Tab_Calculator);
+            app.HeightmEditFieldLabel.Position = [30 340 80 22];
+            app.HeightmEditFieldLabel.Text = 'Height {m}';
+            app.HeightmEditFieldLabel.FontColor = textColor;
+            app.HeightmEditField = uieditfield(app.Tab_Calculator, 'numeric');
+            app.HeightmEditField.Position = [120 340 160 22];
+            app.HeightmEditField.BackgroundColor = inputBg;
+            app.HeightmEditField.FontColor = [1 1 1];
+            app.HeightmEditField.Value = 0.04;
+
+            app.SidemEditFieldLabel = uilabel(app.Tab_Calculator);
+            app.SidemEditFieldLabel.Position = [30 380 80 22];
+            app.SidemEditFieldLabel.Text = 'Side {m}';
+            app.SidemEditFieldLabel.FontColor = textColor;
+            app.SidemEditField = uieditfield(app.Tab_Calculator, 'numeric');
+            app.SidemEditField.Position = [120 380 160 22];
+            app.SidemEditField.BackgroundColor = inputBg;
+            app.SidemEditField.FontColor = [1 1 1];
+            app.SidemEditField.Value = 0.05;
+
+            app.OuterDiametermEditFieldLabel = uilabel(app.Tab_Calculator);
+            app.OuterDiametermEditFieldLabel.Position = [20 380 120 22];
+            app.OuterDiametermEditFieldLabel.Text = 'Outer Diameter (m)';
+            app.OuterDiametermEditFieldLabel.FontColor = textColor;
+            app.OuterDiametermEditField = uieditfield(app.Tab_Calculator, 'numeric');
+            app.OuterDiametermEditField.Position = [160 380 140 22];
+            app.OuterDiametermEditField.BackgroundColor = inputBg;
+            app.OuterDiametermEditField.FontColor = [1 1 1];
+            app.OuterDiametermEditField.Value = 0.10;
+
+            app.InnerDiametermEditFieldLabel = uilabel(app.Tab_Calculator);
+            app.InnerDiametermEditFieldLabel.Position = [20 340 120 22];
+            app.InnerDiametermEditFieldLabel.Text = 'Inner Diameter (m)';
+            app.InnerDiametermEditFieldLabel.FontColor = textColor;
+            app.InnerDiametermEditField = uieditfield(app.Tab_Calculator, 'numeric');
+            app.InnerDiametermEditField.Position = [160 340 140 22];
+            app.InnerDiametermEditField.BackgroundColor = inputBg;
+            app.InnerDiametermEditField.FontColor = [1 1 1];
+            app.InnerDiametermEditField.Value = 0.05;
+
+            app.Image = uiimage(app.Tab_Calculator);
+            app.Image.Position = [600 340 300 200];
+            app.Image.ImageSource = 'circular_pipe.png';
+
+            app.CalculateButton = uibutton(app.Tab_Calculator, 'push');
+            app.CalculateButton.Text = 'Calculate';
+            app.CalculateButton.Position = [30 280 100 30];
+            app.CalculateButton.ButtonPushedFcn = createCallbackFcn(app, @CalculateButtonPushed, true);
+            app.CalculateButton.BackgroundColor = accent;
+            app.CalculateButton.FontColor = [1 1 1];
+            app.CalculateButton.FontWeight = 'bold';
+
+            app.ClearButton = uibutton(app.Tab_Calculator, 'push');
+            app.ClearButton.Text = 'Clear';
+            app.ClearButton.Position = [150 280 100 30];
+            app.ClearButton.ButtonPushedFcn = createCallbackFcn(app, @ClearButtonPushed, true);
+            app.ClearButton.BackgroundColor = danger;
+            app.ClearButton.FontColor = [1 1 1];
+            app.ClearButton.FontWeight = 'bold';
+
+            app.ReynoldsNumberEditFieldLabel = uilabel(app.Tab_Calculator);
+            app.ReynoldsNumberEditFieldLabel.Position = [30 220 140 22];
+            app.ReynoldsNumberEditFieldLabel.Text = 'Reynolds Number';
+            app.ReynoldsNumberEditFieldLabel.FontColor = textColor;
+            app.ReynoldsNumberEditField = uieditfield(app.Tab_Calculator, 'text');
+            app.ReynoldsNumberEditField.Position = [180 220 120 22];
+            app.ReynoldsNumberEditField.BackgroundColor = inputBg;
+            app.ReynoldsNumberEditField.FontColor = [1 1 1];
+
+            app.FlowRegimeEditFieldLabel = uilabel(app.Tab_Calculator);
+            app.FlowRegimeEditFieldLabel.Position = [30 180 140 22];
+            app.FlowRegimeEditFieldLabel.Text = 'Flow Regime';
+            app.FlowRegimeEditFieldLabel.FontColor = textColor;
+            app.FlowRegimeEditField = uieditfield(app.Tab_Calculator, 'text');
+            app.FlowRegimeEditField.Position = [180 180 120 22];
+            app.FlowRegimeEditField.BackgroundColor = inputBg;
+            app.FlowRegimeEditField.FontColor = [1 1 1];
+
+            app.DarcyFrictionFactorfEditFieldLabel = uilabel(app.Tab_Calculator);
+            app.DarcyFrictionFactorfEditFieldLabel.Position = [30 140 140 22];
+            app.DarcyFrictionFactorfEditFieldLabel.Text = 'Friction Factor (f)';
+            app.DarcyFrictionFactorfEditFieldLabel.FontColor = textColor;
+            app.DarcyFrictionFactorfEditField = uieditfield(app.Tab_Calculator, 'text');
+            app.DarcyFrictionFactorfEditField.Position = [180 140 120 22];
+            app.DarcyFrictionFactorfEditField.BackgroundColor = inputBg;
+            app.DarcyFrictionFactorfEditField.FontColor = [1 1 1];
+
+            % Tab 2 - results table and button
+            app.UITable_Results = uitable(app.Tab_PredefinedCases);
+            app.UITable_Results.Position = [20 70 940 520];
+            app.UITable_Results.CellSelectionCallback = createCallbackFcn(app, @UITable_ResultsCellSelection, true);
+            app.UITable_Results.ColumnSortable = true;
+            app.UITable_Results.BackgroundColor = inputBg;
+            app.UITable_Results.FontColor = [1 1 1];
+            app.UITable_Results.FontName = 'Consolas';
+            app.UITable_Results.FontSize = 12;
+
+            app.RunAnalysisButton = uibutton(app.Tab_PredefinedCases, 'push');
+            app.RunAnalysisButton.Text = 'Run & Update All Analyses';
+            app.RunAnalysisButton.Position = [20 10 260 40];
+            app.RunAnalysisButton.ButtonPushedFcn = createCallbackFcn(app, @RunAnalysisButtonPushed, true);
+            app.RunAnalysisButton.BackgroundColor = violet;
+            app.RunAnalysisButton.FontColor = [1 1 1];
+            app.RunAnalysisButton.FontWeight = 'bold';
+
+            % Tab 3 - Profiles axes
+            app.UIAxes_Profiles = uiaxes(app.Tab_Profiles);
+            app.UIAxes_Profiles.Position = [40 40 900 540];
+            title(app.UIAxes_Profiles, 'Velocity Profiles', 'Color', textColor);
+            app.UIAxes_Profiles.Color = bg;
+            app.UIAxes_Profiles.XColor = textColor;
+            app.UIAxes_Profiles.YColor = textColor;
+            app.UIAxes_Profiles.Box = 'on';
+            app.UIAxes_Profiles.GridColor = [80 80 110]/255;
+            app.UIAxes_Profiles.FontColor = textColor;
+
+            % Tab 4 - Friction axes
+            app.UIAxes_Friction = uiaxes(app.Tab_Friction);
+            app.UIAxes_Friction.Position = [40 40 900 540];
+            title(app.UIAxes_Friction, 'Darcy Friction Factor vs Reynolds Number', 'Color', textColor);
+            app.UIAxes_Friction.Color = bg;
+            app.UIAxes_Friction.XColor = textColor;
+            app.UIAxes_Friction.YColor = textColor;
+            app.UIAxes_Friction.Box = 'on';
+            app.UIAxes_Friction.GridColor = [80 80 110]/255;
+
+            % Tab 5 - Conceptual axis triplet
+            app.UIAxes_Laminar = uiaxes(app.Tab_Concepts);
+            app.UIAxes_Laminar.Position = [30 120 300 400];
+            title(app.UIAxes_Laminar, 'Laminar', 'Color', textColor);
+            app.UIAxes_Laminar.Color = bg;
+            app.UIAxes_Laminar.XColor = textColor;
+            app.UIAxes_Laminar.YColor = textColor;
+            app.UIAxes_Laminar.Box = 'on';
+
+            app.UIAxes_Transition = uiaxes(app.Tab_Concepts);
+            app.UIAxes_Transition.Position = [340 120 300 400];
+            title(app.UIAxes_Transition, 'Transition', 'Color', textColor);
+            app.UIAxes_Transition.Color = bg;
+            app.UIAxes_Transition.XColor = textColor;
+            app.UIAxes_Transition.YColor = textColor;
+            app.UIAxes_Transition.Box = 'on';
+
+            app.UIAxes_Turbulent = uiaxes(app.Tab_Concepts);
+            app.UIAxes_Turbulent.Position = [650 120 300 400];
+            title(app.UIAxes_Turbulent, 'Turbulent', 'Color', textColor);
+            app.UIAxes_Turbulent.Color = bg;
+            app.UIAxes_Turbulent.XColor = textColor;
+            app.UIAxes_Turbulent.YColor = textColor;
+            app.UIAxes_Turbulent.Box = 'on';
+
+            app.PlotConceptualFlowTitle = uilabel(app.Tab_Concepts);
+            app.PlotConceptualFlowTitle.Position = [350 540 300 30];
+            app.PlotConceptualFlowTitle.Text = 'Part 5: Conceptual Comparison of Flow Regimes';
+            app.PlotConceptualFlowTitle.FontColor = textColor;
+            app.PlotConceptualFlowTitle.FontWeight = 'bold';
+
+            % Apply general style tweaks to labels (search and apply)
+            allLabels = findall(app.UIFigure, 'Type', 'uilabel');
+            for i = 1:length(allLabels)
+                try
+                    allLabels(i).FontColor = textColor;
+                catch
+                end
+            end
+
+            % Make edit fields consistent
+            allEdits = findall(app.UIFigure, '-property', 'BackgroundColor');
+            for i = 1:length(allEdits)
+                try
+                    % Keep table and axes backgrounds intact; only edit fields/button look
+                    if isa(allEdits(i), 'matlab.ui.control.EditField') || isa(allEdits(i), 'matlab.ui.control.NumericEditField') || isa(allEdits(i), 'matlab.ui.control.DropDown')
+                        allEdits(i).BackgroundColor = inputBg;
+                        allEdits(i).FontColor = [1 1 1];
+                    end
+                catch
+                end
+            end
+
+            % Finalize: show UIFigure
+            app.UIFigure.Visible = 'on';
+        end
+    end
+
+    % --- App Creation ---
+    methods (Access = public)
+        function app = biotransport_full_app
+            % Create and configure components
+            createComponents(app)
+
+            % Register the app with App Designer runtime
+            registerApp(app, app.UIFigure)
+
+            % Execute the startup function
+            try
+                startupFcn(app);
+            catch ME
+                warning('startupFcn error: %s', ME.message);
+            end
+
+            if nargout == 0
+                clear app
+            end
+        end
+
+        function delete(app)
+            % Delete UIFigure when app is deleted
+            try
+                delete(app.UIFigure)
+            catch
+            end
+        end
+    end
+end
