@@ -29,22 +29,22 @@ This task demonstrates the application of theoretical biofluid mechanics concept
 
 **Folder explanation:**
 
-- **src/**  
+- **src**  
   Contains the MATLAB source code used for calculations, plotting velocity profiles, and friction factor analysis.
 
-- **TaskGUI/**  
+- **TaskGUI**  
   Includes the MATLAB graphical user interface files that allow interactive input of fluid properties and automatic flow regime identification.
 
-- **report/**  
+- **report**  
   The final written report describing the methodology, theory, results, discussion, and conclusions of the task.
 
-- **Simulation Pictures/** and **Simulation Pictures2/**  
+- **Simulation Pictures** and **Simulation Pictures2/**  
   CFD simulation results showing velocity contours, pressure distributions, and flow development in different geometries.
 
-- **screenshots of app/**  
+- **screenshots of app**  
   Screenshots of the MATLAB application interface and generated plots.
 
-- **statement/**  
+- **statement**  
   The original assignment description and task requirements provided for Task 01.
 
 ---
@@ -62,19 +62,19 @@ This task highlights the impact of stenosis severity and blood rheology on flow 
 
 **Folder explanation:**
 
-- **Figures/**  
+- **Figures**  
   Contains all CFD post-processing results, including:
-  - No stenosis case
-  - Mild stenosis case
-  - Severe stenosis (Newtonian)
-  - Severe stenosis (Non-Newtonian)
+  - No stenosis case (0%)
+  - Mild stenosis case (50%)
+  - Severe stenosis (Newtonian) (75%)
+  - Severe stenosis (Non-Newtonian) (75%)
   - Pressure drop plots
   - Velocity contours, streamlines, recirculation zones, and wall shear stress visualizations
 
-- **report/**  
+- **report**  
   The final report presenting the simulation setup, assumptions, results, analysis, and biomedical interpretation.
 
-- **statement/**  
+- **statement**  
   The original assignment description and task requirements provided for Task 02.
 
 
