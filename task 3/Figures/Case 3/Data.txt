@@ -1,0 +1,12 @@
+Minimum temperature in epiderms: 282.85 K
+Minimum temperature in dermis: 285.51 K
+Minimum temperature in fat: 310.15 K
+
+Time to reach 15C: 274.74 seconds in epiderms, 424.54 in dermis, never in fat
+Time to reach 10C: 583 seconds in epiderms, never in dermis and fat
+
+Depth of 15 C: 3.25 mm from the epiderms
+
+Cooling rate epidermis: 2 K/s max, 0.0167 K/s min
+Cooling rate dermis: max: 0.03 K/s, min: 0.02
+Cooling rate fat: 0 K/s
