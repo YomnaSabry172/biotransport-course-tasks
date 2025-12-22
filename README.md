@@ -79,6 +79,39 @@ This task highlights the impact of stenosis severity and blood rheology on flow 
 
 
 ---
+## Task 03: Transient Bioheat Transfer in Multilayer Human Skin (Cryotherapy)
+
+**Task 03** focuses on the **bioheat transfer** part of the course. This task investigates **transient heat conduction in multilayer human skin during cryotherapy**, with emphasis on how cooling evolves with **time and depth** under surface cooling conditions.
+
+A three-dimensional numerical model is used to represent a simplified skin structure composed of the **epidermis, dermis, and subcutaneous fat** layers. The tissue is initially at body temperature and exposed to surface cooling through a convective boundary condition for **10 minutes**. The analysis examines temperature evolution within each layer and evaluates the effect of the **convective heat transfer coefficient** on cooling rate and penetration depth.
+
+A **baseline cooling case** is used for detailed visualization, while additional cases with different convective coefficients are analyzed comparatively. Results include temperature–depth profiles, temperature–time histories at selected depths, cross-sectional temperature contours, and quantitative metrics such as minimum temperature, time to reach clinical thresholds (10°C and 15°C), and cooling penetration depth.
+
+This task demonstrates the application of transient heat transfer principles to a biomedical problem and highlights the insulating role of subcutaneous fat and the dominant influence of surface convection on superficial tissue cooling.
+
+---
+
+### Folder explanation:
+
+- **Figures**  
+  Contains all simulation results organized by convective cooling case:
+  - **Case 1** – Baseline cooling (h = 50 W/m²·K)
+  - **Case 2** – Mild cooling (h = 20 W/m²·K)
+  - **Case 3** – Aggressive cooling (h = 100 W/m²·K)
+
+  Each case folder includes:
+  - Temperature vs. depth plots at selected times (0, 60, 300, 600 s)
+  - Temperature vs. time plots at selected depths (epidermis, dermis, fat)
+  - Cross-sectional temperature contour at t = 600 s
+  - Extracted numerical data used for post-processing and analysis
+
+- **report**  
+  The final technical report describing the model formulation, governing equations, numerical setup, results, comparative analysis across convective coefficients, and physiological interpretation of the cooling behavior.
+
+- **statement**  
+  The original task description and requirements provided for Task 03.
+
+---
 ## Team Members
 
 - Yomna Sabry  
