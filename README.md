@@ -38,7 +38,7 @@ This task demonstrates the application of theoretical biofluid mechanics concept
 - **report**  
   The final written report describing the methodology, theory, results, discussion, and conclusions of the task.
 
-- **Simulation Pictures** and **Simulation Pictures2/**  
+- **Simulation Pictures** and **Simulation Pictures2**  
   CFD simulation results showing velocity contours, pressure distributions, and flow development in different geometries.
 
 - **screenshots of app**  
